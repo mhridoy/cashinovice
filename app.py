@@ -7,6 +7,7 @@ import base64
 from fpdf import FPDF
 import numpy as np
 import seaborn as sns
+import traceback
 
 # Set page configuration
 st.set_page_config(page_title="Sales & Purchase Tracker", layout="wide", initial_sidebar_state="collapsed")
@@ -267,88 +268,159 @@ def submit_sales():
     # Update all dates
     st.session_state.sales_df = update_date(st.session_state.sales_df, selected_date)
 
-# Create PDF function
+# Cleaned-up Create PDF function with improved error handling
 def create_pdf(purchase_df, sales_df, date_val, purchase_total, sales_total, profit):
-    pdf = FPDF()
-    pdf.add_page()
+    try:
+        # First, ensure clean DataFrames with valid data types
+        purchase_df = ensure_valid_dataframe(purchase_df, 
+            pd.DataFrame({
+                'SL': [1],
+                'Date': [date.today().strftime('%Y-%m-%d')],
+                'Customer Name': [''],
+                'Amount': [0],
+                'Purchase Description': ['']
+            }),
+            name="Purchase for PDF"
+        )
+        
+        sales_df = ensure_valid_dataframe(sales_df, 
+            pd.DataFrame({
+                'SL': [1],
+                'Date': [date.today().strftime('%Y-%m-%d')],
+                'Customer Name': [''],
+                'Amount': [0],
+                'Sales Description': ['']
+            }),
+            name="Sales for PDF"
+        )
+        
+        # Ensure Amount columns have numeric values
+        purchase_df['Amount'] = pd.to_numeric(purchase_df['Amount'], errors='coerce').fillna(0)
+        sales_df['Amount'] = pd.to_numeric(sales_df['Amount'], errors='coerce').fillna(0)
+        
+        # Create new PDF with fixed encoding
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # Set font
+        pdf.set_font("Arial", "B", 16)
+        
+        # Title
+        pdf.cell(190, 10, "Business Transaction Report", 1, 1, "C")
+        pdf.ln(10)
+        
+        # Date
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(190, 10, f"Date: {date_val.strftime('%Y-%m-%d')}", 0, 1, "L")
+        pdf.ln(5)
+        
+        # Summary Section
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(190, 10, "Summary:", 0, 1, "L")
+        pdf.ln(2)
+        
+        # Use proper currency formatting with Tk symbol for Bengali Taka
+        pdf.set_font("Arial", "", 12)
+        pdf.cell(95, 10, f"Total Purchase: Tk {purchase_total:,.2f}", 1, 0, "L")
+        pdf.cell(95, 10, f"Total Sales: Tk {sales_total:,.2f}", 1, 1, "L")
+        
+        profit_label = "Profit" if profit >= 0 else "Loss"
+        pdf.cell(190, 10, f"Total {profit_label}: Tk {abs(profit):,.2f}", 1, 1, "L")
+        pdf.ln(10)
+        
+        # Purchase Table
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(190, 10, "Purchase Transactions:", 0, 1, "L")
+        pdf.ln(2)
+        
+        # Table header
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(15, 10, "SL", 1, 0, "C")
+        pdf.cell(35, 10, "Date", 1, 0, "C")
+        pdf.cell(50, 10, "Customer Name", 1, 0, "C")
+        pdf.cell(40, 10, "Amount", 1, 0, "C")
+        pdf.cell(50, 10, "Description", 1, 1, "C")
+        
+        # Table content with safe string handling
+        pdf.set_font("Arial", "", 10)
+        for i, row in purchase_df.iterrows():
+            pdf.cell(15, 10, str(row.get('SL', '')), 1, 0, "C")
+            pdf.cell(35, 10, str(row.get('Date', '')), 1, 0, "C")
+            
+            # Safely truncate customer name if too long
+            customer_name = str(row.get('Customer Name', ''))
+            if len(customer_name) > 20:
+                customer_name = customer_name[:17] + "..."
+            pdf.cell(50, 10, customer_name, 1, 0, "L")
+            
+            # Format amount with error handling
+            amount = row.get('Amount', 0)
+            try:
+                amount_str = f"Tk {float(amount):,.2f}"
+            except (ValueError, TypeError):
+                amount_str = "Tk 0.00"
+            pdf.cell(40, 10, amount_str, 1, 0, "R")
+            
+            # Safely truncate description if too long
+            description = str(row.get('Purchase Description', ''))
+            if len(description) > 20:
+                description = description[:17] + "..."
+            pdf.cell(50, 10, description, 1, 1, "L")
+        
+        pdf.ln(10)
+        
+        # Sales Table
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(190, 10, "Sales Transactions:", 0, 1, "L")
+        pdf.ln(2)
+        
+        # Table header
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(15, 10, "SL", 1, 0, "C")
+        pdf.cell(35, 10, "Date", 1, 0, "C")
+        pdf.cell(50, 10, "Customer Name", 1, 0, "C")
+        pdf.cell(40, 10, "Amount", 1, 0, "C")
+        pdf.cell(50, 10, "Description", 1, 1, "C")
+        
+        # Table content with safe string handling
+        pdf.set_font("Arial", "", 10)
+        for i, row in sales_df.iterrows():
+            pdf.cell(15, 10, str(row.get('SL', '')), 1, 0, "C")
+            pdf.cell(35, 10, str(row.get('Date', '')), 1, 0, "C")
+            
+            # Safely truncate customer name if too long
+            customer_name = str(row.get('Customer Name', ''))
+            if len(customer_name) > 20:
+                customer_name = customer_name[:17] + "..."
+            pdf.cell(50, 10, customer_name, 1, 0, "L")
+            
+            # Format amount with error handling
+            amount = row.get('Amount', 0)
+            try:
+                amount_str = f"Tk {float(amount):,.2f}"
+            except (ValueError, TypeError):
+                amount_str = "Tk 0.00"
+            pdf.cell(40, 10, amount_str, 1, 0, "R")
+            
+            # Safely truncate description if too long
+            description = str(row.get('Sales Description', ''))
+            if len(description) > 20:
+                description = description[:17] + "..."
+            pdf.cell(50, 10, description, 1, 1, "L")
+        
+        # Footer
+        pdf.ln(20)
+        pdf.set_font("Arial", "I", 8)
+        pdf.cell(0, 10, "Business Transaction Manager - Generated on " + date.today().strftime("%Y-%m-%d"), 0, 0, "C")
+        
+        # Return the PDF as bytes with ASCII encoding
+        return pdf.output(dest='S').encode('latin1')
     
-    # Set font
-    pdf.set_font("Arial", "B", 16)
-    
-    # Title
-    pdf.cell(190, 10, "Business Transaction Report", 1, 1, "C")
-    pdf.ln(10)
-    
-    # Date
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(190, 10, f"Date: {date_val.strftime('%Y-%m-%d')}", 0, 1, "L")
-    pdf.ln(5)
-    
-    # Summary Section
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(190, 10, "Summary:", 0, 1, "L")
-    pdf.ln(2)
-    
-    pdf.set_font("Arial", "", 12)
-    pdf.cell(95, 10, f"Total Purchase: ৳{purchase_total:,.2f}", 1, 0, "L")
-    pdf.cell(95, 10, f"Total Sales: ৳{sales_total:,.2f}", 1, 1, "L")
-    
-    profit_label = "Profit" if profit >= 0 else "Loss"
-    pdf.cell(190, 10, f"Total {profit_label}: ৳{abs(profit):,.2f}", 1, 1, "L")
-    pdf.ln(10)
-    
-    # Purchase Table
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(190, 10, "Purchase Transactions:", 0, 1, "L")
-    pdf.ln(2)
-    
-    # Table header
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(15, 10, "SL", 1, 0, "C")
-    pdf.cell(35, 10, "Date", 1, 0, "C")
-    pdf.cell(50, 10, "Customer Name", 1, 0, "C")
-    pdf.cell(40, 10, "Amount", 1, 0, "C")
-    pdf.cell(50, 10, "Description", 1, 1, "C")
-    
-    # Table content
-    pdf.set_font("Arial", "", 10)
-    for i, row in purchase_df.iterrows():
-        pdf.cell(15, 10, str(row['SL']), 1, 0, "C")
-        pdf.cell(35, 10, str(row['Date']), 1, 0, "C")
-        pdf.cell(50, 10, str(row['Customer Name']), 1, 0, "L")
-        pdf.cell(40, 10, f"৳{row['Amount']:,.2f}" if isinstance(row['Amount'], (int, float)) else str(row['Amount']), 1, 0, "R")
-        pdf.cell(50, 10, str(row['Purchase Description']), 1, 1, "L")
-    
-    pdf.ln(10)
-    
-    # Sales Table
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(190, 10, "Sales Transactions:", 0, 1, "L")
-    pdf.ln(2)
-    
-    # Table header
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(15, 10, "SL", 1, 0, "C")
-    pdf.cell(35, 10, "Date", 1, 0, "C")
-    pdf.cell(50, 10, "Customer Name", 1, 0, "C")
-    pdf.cell(40, 10, "Amount", 1, 0, "C")
-    pdf.cell(50, 10, "Description", 1, 1, "C")
-    
-    # Table content
-    pdf.set_font("Arial", "", 10)
-    for i, row in sales_df.iterrows():
-        pdf.cell(15, 10, str(row['SL']), 1, 0, "C")
-        pdf.cell(35, 10, str(row['Date']), 1, 0, "C")
-        pdf.cell(50, 10, str(row['Customer Name']), 1, 0, "L")
-        pdf.cell(40, 10, f"৳{row['Amount']:,.2f}" if isinstance(row['Amount'], (int, float)) else str(row['Amount']), 1, 0, "R")
-        pdf.cell(50, 10, str(row['Sales Description']), 1, 1, "L")
-    
-    # Footer
-    pdf.ln(20)
-    pdf.set_font("Arial", "I", 8)
-    pdf.cell(0, 10, "Business Transaction Manager - Generated on " + date.today().strftime("%Y-%m-%d"), 0, 0, "C")
-    
-    return pdf.output(dest='S').encode('latin1')
+    except Exception as e:
+        # Detailed error logging
+        st.error(f"PDF Generation Error: {str(e)}")
+        st.error(f"Error Details: {traceback.format_exc()}")
+        raise Exception(f"PDF creation failed: {str(e)}")
 
 # Create two columns for Purchase and Sales data entry
 tab1, tab2, tab3 = st.tabs(["📊 Data Entry", "📈 Dashboard", "📋 Export"])
@@ -446,9 +518,13 @@ with tab2:
         name="Sales"
     )
     
+    # Ensure Amount columns are numeric
+    clean_purchase_df['Amount'] = pd.to_numeric(clean_purchase_df['Amount'], errors='coerce').fillna(0)
+    clean_sales_df['Amount'] = pd.to_numeric(clean_sales_df['Amount'], errors='coerce').fillna(0)
+    
     # Calculate totals
-    purchase_total = clean_purchase_df['Amount'].sum() if 'Amount' in clean_purchase_df.columns else 0
-    sales_total = clean_sales_df['Amount'].sum() if 'Amount' in clean_sales_df.columns else 0
+    purchase_total = clean_purchase_df['Amount'].sum()
+    sales_total = clean_sales_df['Amount'].sum()
     profit = sales_total - purchase_total
     
     # Summary Stats
@@ -639,6 +715,10 @@ with tab3:
         name="Sales"
     )
     
+    # Ensure Amount columns are numeric for exports
+    clean_purchase_df['Amount'] = pd.to_numeric(clean_purchase_df['Amount'], errors='coerce').fillna(0)
+    clean_sales_df['Amount'] = pd.to_numeric(clean_sales_df['Amount'], errors='coerce').fillna(0)
+    
     with col_exp1:
         if st.button("Download Purchase Data (CSV)", key="download_purchase"):
             csv = clean_purchase_df.to_csv(index=False).encode('utf-8')
@@ -662,30 +742,41 @@ with tab3:
     with col_exp3:
         if st.button("Generate Complete Report (PDF)", key="generate_pdf"):
             try:
-                # Calculate totals for PDF
-                purchase_total = clean_purchase_df['Amount'].sum() if 'Amount' in clean_purchase_df.columns else 0
-                sales_total = clean_sales_df['Amount'].sum() if 'Amount' in clean_sales_df.columns else 0
-                profit = sales_total - purchase_total
+                # Verify the data is valid before trying to generate PDF
+                valid_purchase_data = not clean_purchase_df.empty and 'Purchase Description' in clean_purchase_df.columns
+                valid_sales_data = not clean_sales_df.empty and 'Sales Description' in clean_sales_df.columns
                 
-                # Generate PDF
-                pdf_data = create_pdf(
-                    clean_purchase_df, 
-                    clean_sales_df,
-                    selected_date,
-                    purchase_total,
-                    sales_total,
-                    profit
-                )
-                
-                # Offer download
-                st.download_button(
-                    label="Download PDF Report",
-                    data=pdf_data,
-                    file_name=f"business_report_{selected_date.strftime('%Y-%m-%d')}.pdf",
-                    mime="application/pdf"
-                )
+                if not valid_purchase_data and not valid_sales_data:
+                    st.error("No valid transaction data available. Please add some transactions first.")
+                else:
+                    # Calculate totals for PDF with proper numeric handling
+                    purchase_total = clean_purchase_df['Amount'].sum()
+                    sales_total = clean_sales_df['Amount'].sum()
+                    profit = sales_total - purchase_total
+                    
+                    # Show progress information
+                    with st.spinner("Generating PDF report..."):
+                        # Generate PDF with improved error handling
+                        pdf_data = create_pdf(
+                            clean_purchase_df, 
+                            clean_sales_df,
+                            selected_date,
+                            purchase_total,
+                            sales_total,
+                            profit
+                        )
+                        
+                        # Offer download
+                        st.success("PDF generated successfully!")
+                        st.download_button(
+                            label="Download PDF Report",
+                            data=pdf_data,
+                            file_name=f"business_report_{selected_date.strftime('%Y-%m-%d')}.pdf",
+                            mime="application/pdf"
+                        )
             except Exception as e:
-                st.error(f"Error generating PDF: Please make sure you have valid data and try again.")
+                st.error(f"Error generating PDF: {str(e)}")
+                st.error("If the problem persists, try using simplified data or exporting as CSV instead.")
     
     st.markdown('</div>', unsafe_allow_html=True)
     
