@@ -163,16 +163,6 @@ with col_date:
     st.session_state.selected_date = selected_date  # Persist the selected date
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Load customer names for autocomplete
-def load_customer_names():
-    customer_names = set()
-    for df_name in ['purchase_df', 'sales_df', 'expense_df']:
-        if df_name in st.session_state and not st.session_state[df_name].empty:
-            customer_names.update(st.session_state[df_name]['Customer Name'].dropna().unique())
-    return list(customer_names)
-
-customer_options = load_customer_names()
-
 # Initialize session state for dataframes
 if 'purchase_df' not in st.session_state:
     if os.path.exists("purchase_data.csv"):
@@ -372,12 +362,7 @@ with tab1:
             use_container_width=True,
             hide_index=True,
             column_config={
-                "Customer Name": st.column_config.TextColumn(
-                    "Customer Name",
-                    help="Enter customer name",
-                    default="",
-                    autocomplete=customer_options
-                )
+                "Customer Name": st.column_config.TextColumn("Customer Name", help="Enter customer name")
             }
         )
         if st.button("Save Purchase", key="save_purchase", on_click=submit_purchase):
@@ -406,12 +391,7 @@ with tab1:
             use_container_width=True,
             hide_index=True,
             column_config={
-                "Customer Name": st.column_config.TextColumn(
-                    "Customer Name",
-                    help="Enter customer name",
-                    default="",
-                    autocomplete=customer_options
-                )
+                "Customer Name": st.column_config.TextColumn("Customer Name", help="Enter customer name")
             }
         )
         if st.button("Save Sales", key="save_sales", on_click=submit_sales):
@@ -440,12 +420,7 @@ with tab1:
             use_container_width=True,
             hide_index=True,
             column_config={
-                "Customer Name": st.column_config.TextColumn(
-                    "Customer Name",
-                    help="Enter customer name",
-                    default="",
-                    autocomplete=customer_options
-                )
+                "Customer Name": st.column_config.TextColumn("Customer Name", help="Enter customer name")
             }
         )
         if st.button("Save Expense", key="save_expense", on_click=submit_expense):
