@@ -204,6 +204,28 @@ if 'sales_df' not in st.session_state:
         'Sales Description': ['']
     })
 
+# Function to ensure valid DataFrame structure before using data_editor
+def ensure_valid_dataframe(df, default_structure, name="DataFrame"):
+    try:
+        # If not a DataFrame, convert it
+        if not isinstance(df, pd.DataFrame):
+            try:
+                df = pd.DataFrame(df)
+            except Exception as e:
+                st.warning(f"Error converting {name} to DataFrame: {str(e)}")
+                return default_structure.copy()
+        
+        # Clean data by converting to records and back
+        try:
+            records = df.to_dict('records')
+            return pd.DataFrame(records)
+        except Exception as e:
+            st.warning(f"Error cleaning {name} data: {str(e)}")
+            return default_structure.copy()
+    except Exception as e:
+        st.error(f"Unexpected error in {name}: {str(e)}")
+        return default_structure.copy()
+
 # Function to update date in dataframe
 def update_date(df, date_val):
     # Create a copy to avoid SettingWithCopyWarning
@@ -213,15 +235,35 @@ def update_date(df, date_val):
 
 # Handle form submissions - Purchase
 def submit_purchase():
-    # Update the session state
-    st.session_state.purchase_df = st.session_state.purchase_editor
+    # Update the session state with clean data
+    st.session_state.purchase_df = ensure_valid_dataframe(
+        st.session_state.purchase_editor,
+        pd.DataFrame({
+            'SL': [1],
+            'Date': [date.today().strftime('%Y-%m-%d')],
+            'Customer Name': [''],
+            'Amount': [0],
+            'Purchase Description': ['']
+        }),
+        name="Purchase"
+    )
     # Update all dates
     st.session_state.purchase_df = update_date(st.session_state.purchase_df, selected_date)
 
 # Handle form submissions - Sales
 def submit_sales():
-    # Update the session state
-    st.session_state.sales_df = st.session_state.sales_editor
+    # Update the session state with clean data
+    st.session_state.sales_df = ensure_valid_dataframe(
+        st.session_state.sales_editor,
+        pd.DataFrame({
+            'SL': [1],
+            'Date': [date.today().strftime('%Y-%m-%d')],
+            'Customer Name': [''],
+            'Amount': [0],
+            'Sales Description': ['']
+        }),
+        name="Sales"
+    )
     # Update all dates
     st.session_state.sales_df = update_date(st.session_state.sales_df, selected_date)
 
@@ -309,7 +351,7 @@ def create_pdf(purchase_df, sales_df, date_val, purchase_total, sales_total, pro
     return pdf.output(dest='S').encode('latin1')
 
 # Create two columns for Purchase and Sales data entry
-tab1, tab2, tab3 = st.tabs(["📊 Data Entry", "📈 Dashboard", "📑 Export"])
+tab1, tab2, tab3 = st.tabs(["📊 Data Entry", "📈 Dashboard", "📋 Export"])
 
 with tab1:
     col1, col2 = st.columns(2)
@@ -317,11 +359,24 @@ with tab1:
     # Purchase Section
     with col1:
         st.markdown('<div class="card" style="border-left: 5px solid #1e40af;">', unsafe_allow_html=True)
-        st.markdown('<h2 style="color: #1e40af; font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem;">📥 Purchase Entry</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 style="color: #1e40af; font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem;">💸 Purchase Entry</h2>', unsafe_allow_html=True)
+        
+        # Clean the DataFrame before using data_editor
+        clean_purchase_df = ensure_valid_dataframe(
+            st.session_state.purchase_df,
+            pd.DataFrame({
+                'SL': [1],
+                'Date': [date.today().strftime('%Y-%m-%d')],
+                'Customer Name': [''],
+                'Amount': [0],
+                'Purchase Description': ['']
+            }),
+            name="Purchase"
+        )
         
         # Display current purchase data
         edited_purchase_df = st.data_editor(
-            st.session_state.purchase_df,
+            clean_purchase_df,
             num_rows="dynamic",
             key="purchase_editor",
             use_container_width=True,
@@ -336,11 +391,24 @@ with tab1:
     # Sales Section
     with col2:
         st.markdown('<div class="card" style="border-left: 5px solid #047857;">', unsafe_allow_html=True)
-        st.markdown('<h2 style="color: #047857; font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem;">📤 Sales Entry</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 style="color: #047857; font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem;">💰 Sales Entry</h2>', unsafe_allow_html=True)
+        
+        # Clean the DataFrame before using data_editor
+        clean_sales_df = ensure_valid_dataframe(
+            st.session_state.sales_df,
+            pd.DataFrame({
+                'SL': [1],
+                'Date': [date.today().strftime('%Y-%m-%d')],
+                'Customer Name': [''],
+                'Amount': [0],
+                'Sales Description': ['']
+            }),
+            name="Sales"
+        )
         
         # Display current sales data
         edited_sales_df = st.data_editor(
-            st.session_state.sales_df,
+            clean_sales_df,
             num_rows="dynamic",
             key="sales_editor",
             use_container_width=True,
@@ -353,9 +421,34 @@ with tab1:
         st.markdown('</div>', unsafe_allow_html=True)
 
 with tab2:
+    # Ensure clean data for calculations
+    clean_purchase_df = ensure_valid_dataframe(
+        st.session_state.purchase_df,
+        pd.DataFrame({
+            'SL': [1],
+            'Date': [date.today().strftime('%Y-%m-%d')],
+            'Customer Name': [''],
+            'Amount': [0],
+            'Purchase Description': ['']
+        }),
+        name="Purchase"
+    )
+    
+    clean_sales_df = ensure_valid_dataframe(
+        st.session_state.sales_df,
+        pd.DataFrame({
+            'SL': [1],
+            'Date': [date.today().strftime('%Y-%m-%d')],
+            'Customer Name': [''],
+            'Amount': [0],
+            'Sales Description': ['']
+        }),
+        name="Sales"
+    )
+    
     # Calculate totals
-    purchase_total = st.session_state.purchase_df['Amount'].sum() if 'Amount' in st.session_state.purchase_df.columns else 0
-    sales_total = st.session_state.sales_df['Amount'].sum() if 'Amount' in st.session_state.sales_df.columns else 0
+    purchase_total = clean_purchase_df['Amount'].sum() if 'Amount' in clean_purchase_df.columns else 0
+    sales_total = clean_sales_df['Amount'].sum() if 'Amount' in clean_sales_df.columns else 0
     profit = sales_total - purchase_total
     
     # Summary Stats
@@ -490,15 +583,15 @@ with tab2:
     st.markdown('<h2 style="color: #334155; font-size: 1.5rem; font-weight: 600; text-align: center; margin-bottom: 1.5rem;">Recent Transactions</h2>', unsafe_allow_html=True)
     
     # Show both transactions
-    if not st.session_state.purchase_df.empty and 'Purchase Description' in st.session_state.purchase_df.columns:
-        purchase_display = st.session_state.purchase_df.copy()
+    if not clean_purchase_df.empty and 'Purchase Description' in clean_purchase_df.columns:
+        purchase_display = clean_purchase_df.copy()
         purchase_display['Type'] = 'Purchase'
         purchase_display = purchase_display.rename(columns={'Purchase Description': 'Description'})
     else:
         purchase_display = pd.DataFrame(columns=['SL', 'Date', 'Customer Name', 'Amount', 'Description', 'Type'])
     
-    if not st.session_state.sales_df.empty and 'Sales Description' in st.session_state.sales_df.columns:
-        sales_display = st.session_state.sales_df.copy()
+    if not clean_sales_df.empty and 'Sales Description' in clean_sales_df.columns:
+        sales_display = clean_sales_df.copy()
         sales_display['Type'] = 'Sales'
         sales_display = sales_display.rename(columns={'Sales Description': 'Description'})
     else:
@@ -521,9 +614,34 @@ with tab3:
     
     col_exp1, col_exp2, col_exp3 = st.columns(3)
     
+    # Ensure clean data for downloads
+    clean_purchase_df = ensure_valid_dataframe(
+        st.session_state.purchase_df,
+        pd.DataFrame({
+            'SL': [1],
+            'Date': [date.today().strftime('%Y-%m-%d')],
+            'Customer Name': [''],
+            'Amount': [0],
+            'Purchase Description': ['']
+        }),
+        name="Purchase"
+    )
+    
+    clean_sales_df = ensure_valid_dataframe(
+        st.session_state.sales_df,
+        pd.DataFrame({
+            'SL': [1],
+            'Date': [date.today().strftime('%Y-%m-%d')],
+            'Customer Name': [''],
+            'Amount': [0],
+            'Sales Description': ['']
+        }),
+        name="Sales"
+    )
+    
     with col_exp1:
         if st.button("Download Purchase Data (CSV)", key="download_purchase"):
-            csv = st.session_state.purchase_df.to_csv(index=False).encode('utf-8')
+            csv = clean_purchase_df.to_csv(index=False).encode('utf-8')
             st.download_button(
                 label="Click to Download Purchase CSV",
                 data=csv,
@@ -533,7 +651,7 @@ with tab3:
     
     with col_exp2:
         if st.button("Download Sales Data (CSV)", key="download_sales"):
-            csv = st.session_state.sales_df.to_csv(index=False).encode('utf-8')
+            csv = clean_sales_df.to_csv(index=False).encode('utf-8')
             st.download_button(
                 label="Click to Download Sales CSV",
                 data=csv,
@@ -545,14 +663,14 @@ with tab3:
         if st.button("Generate Complete Report (PDF)", key="generate_pdf"):
             try:
                 # Calculate totals for PDF
-                purchase_total = st.session_state.purchase_df['Amount'].sum() if 'Amount' in st.session_state.purchase_df.columns else 0
-                sales_total = st.session_state.sales_df['Amount'].sum() if 'Amount' in st.session_state.sales_df.columns else 0
+                purchase_total = clean_purchase_df['Amount'].sum() if 'Amount' in clean_purchase_df.columns else 0
+                sales_total = clean_sales_df['Amount'].sum() if 'Amount' in clean_sales_df.columns else 0
                 profit = sales_total - purchase_total
                 
                 # Generate PDF
                 pdf_data = create_pdf(
-                    st.session_state.purchase_df, 
-                    st.session_state.sales_df,
+                    clean_purchase_df, 
+                    clean_sales_df,
                     selected_date,
                     purchase_total,
                     sales_total,
@@ -579,14 +697,14 @@ with tab3:
     preview_tab1, preview_tab2 = st.tabs(["Purchase Data", "Sales Data"])
     
     with preview_tab1:
-        if not st.session_state.purchase_df.empty:
-            st.dataframe(st.session_state.purchase_df, use_container_width=True)
+        if not clean_purchase_df.empty:
+            st.dataframe(clean_purchase_df, use_container_width=True)
         else:
             st.info("No purchase data available.")
     
     with preview_tab2:
-        if not st.session_state.sales_df.empty:
-            st.dataframe(st.session_state.sales_df, use_container_width=True)
+        if not clean_sales_df.empty:
+            st.dataframe(clean_sales_df, use_container_width=True)
         else:
             st.info("No sales data available.")
     
