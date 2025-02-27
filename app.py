@@ -8,6 +8,7 @@ from fpdf import FPDF
 import numpy as np
 import seaborn as sns
 import traceback
+import os
 
 # Set page configuration
 st.set_page_config(page_title="Sales & Purchase Tracker", layout="wide", initial_sidebar_state="collapsed")
@@ -37,7 +38,7 @@ def load_css():
         .dataframe th {
             background-color: #0f172a;
             color: white;
-            padding: 12px;
+            padding: 8px;
             text-align: left;
             font-weight: 600;
             border-top-left-radius: 8px;
@@ -45,7 +46,7 @@ def load_css():
         }
         
         .dataframe td {
-            padding: 10px;
+            padding: 8px;
             border: 1px solid #e2e8f0;
         }
         
@@ -61,70 +62,55 @@ def load_css():
             background-color: #1e40af;
             color: white;
             border-radius: 6px;
-            padding: 0.6rem 1.2rem;
+            padding: 0.5rem 1rem;
             font-weight: 600;
             transition: all 0.3s;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             border: none;
             font-family: 'Poppins', sans-serif;
         }
         
         .stButton>button:hover {
             background-color: #1e3a8a;
-            transform: translateY(-2px);
+            transform: translateY(-1px);
         }
         
         .card {
             background-color: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            transition: all 0.3s;
-        }
-        
-        .card:hover {
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         
         .stat-card {
             background-color: white;
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            transition: all 0.3s;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
             text-align: center;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
         
         .header-bg {
-            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
-            padding: 2rem;
-            border-radius: 16px;
-            margin-bottom: 2rem;
+            background: linear-gradient(135deg, #0f172a 0%, #1e40af 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
             color: white;
             text-align: center;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
         
-        /* Custom CSS for date input */
-        div[data-baseweb="input"] {
+        div[data-baseweb="input"], div[data-baseweb="select"] {
             font-family: 'Poppins', sans-serif !important;
         }
         
-        /* Beautiful scrollbar */
         ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
         }
         
         ::-webkit-scrollbar-track {
@@ -137,28 +123,15 @@ def load_css():
             border-radius: 10px;
         }
         
-        ::-webkit-scrollbar-thumb:hover {
-            background: #64748b;
-        }
-        
-        /* Custom Select Box */
-        div[data-baseweb="select"] {
-            font-family: 'Poppins', sans-serif !important;
-        }
-        
-        /* Custom tabs */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
+            gap: 4px;
         }
         
         .stTabs [data-baseweb="tab"] {
-            height: 50px;
-            white-space: pre-wrap;
+            height: 40px;
             background-color: #f8fafc;
             border-radius: 4px 4px 0px 0px;
-            gap: 1px;
-            padding-top: 10px;
-            padding-bottom: 10px;
+            padding: 8px 16px;
         }
         
         .stTabs [aria-selected="true"] {
@@ -170,646 +143,458 @@ def load_css():
 
 st.markdown(load_css(), unsafe_allow_html=True)
 
-# App header with professional design
+# App header
 st.markdown("""
 <div class="header-bg">
-    <h1 style="font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem;">Business Transaction Manager</h1>
-    <p style="font-size: 1.25rem; opacity: 0.9; margin-bottom: 0;">Track your daily business transactions with ease</p>
+    <h1 style="font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;">Business Transaction Manager</h1>
+    <p style="font-size: 1rem; opacity: 0.9; margin-bottom: 0;">Track your daily business transactions</p>
 </div>
 """, unsafe_allow_html=True)
 
-# Date selector for all entries
-col_date, col_empty1, col_empty2 = st.columns([1, 1, 1])
+# Date selector with persistence
+if 'selected_date' not in st.session_state:
+    st.session_state.selected_date = date.today()
+
+col_date = st.columns(1)[0]
 with col_date:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<h3 style="color: #334155; font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Select Date for All Entries</h3>', unsafe_allow_html=True)
-    selected_date = st.date_input("Transaction Date", date.today())
+    st.markdown('<h3 style="color: #334155; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem;">Select Date</h3>', unsafe_allow_html=True)
+    selected_date = st.date_input("Transaction Date", value=st.session_state.selected_date, key="date_input")
+    st.session_state.selected_date = selected_date  # Persist the selected date
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Initialize session state for dataframes if they don't exist
+# Load customer names for autocomplete
+def load_customer_names():
+    customer_names = set()
+    for df_name in ['purchase_df', 'sales_df', 'expense_df']:
+        if df_name in st.session_state and not st.session_state[df_name].empty:
+            customer_names.update(st.session_state[df_name]['Customer Name'].dropna().unique())
+    return list(customer_names)
+
+customer_options = load_customer_names()
+
+# Initialize session state for dataframes
 if 'purchase_df' not in st.session_state:
-    st.session_state.purchase_df = pd.DataFrame({
-        'SL': [1],
-        'Date': [date.today().strftime('%Y-%m-%d')],
-        'Customer Name': [''],
-        'Amount': [0],
-        'Purchase Description': ['']
-    })
+    if os.path.exists("purchase_data.csv"):
+        st.session_state.purchase_df = pd.read_csv("purchase_data.csv")
+    else:
+        st.session_state.purchase_df = pd.DataFrame({
+            'SL': [1],
+            'Date': [st.session_state.selected_date.strftime('%Y-%m-%d')],
+            'Customer Name': [''],
+            'Amount': [0],
+            'Purchase Description': ['']
+        })
 
 if 'sales_df' not in st.session_state:
-    st.session_state.sales_df = pd.DataFrame({
-        'SL': [1],
-        'Date': [date.today().strftime('%Y-%m-%d')],
-        'Customer Name': [''],
-        'Amount': [0],
-        'Sales Description': ['']
-    })
+    if os.path.exists("sales_data.csv"):
+        st.session_state.sales_df = pd.read_csv("sales_data.csv")
+    else:
+        st.session_state.sales_df = pd.DataFrame({
+            'SL': [1],
+            'Date': [st.session_state.selected_date.strftime('%Y-%m-%d')],
+            'Customer Name': ['Starting Balance'],
+            'Amount': [0],
+            'Sales Description': ['Initial Balance']
+        })
 
-# Function to ensure valid DataFrame structure before using data_editor
+if 'expense_df' not in st.session_state:
+    if os.path.exists("expense_data.csv"):
+        st.session_state.expense_df = pd.read_csv("expense_data.csv")
+    else:
+        st.session_state.expense_df = pd.DataFrame({
+            'SL': [1],
+            'Date': [st.session_state.selected_date.strftime('%Y-%m-%d')],
+            'Customer Name': [''],
+            'Amount': [0],
+            'Expense Description': ['']
+        })
+
+# Function to ensure valid DataFrame structure
 def ensure_valid_dataframe(df, default_structure, name="DataFrame"):
     try:
-        # If not a DataFrame, convert it
         if not isinstance(df, pd.DataFrame):
-            try:
-                df = pd.DataFrame(df)
-            except Exception as e:
-                st.warning(f"Error converting {name} to DataFrame: {str(e)}")
-                return default_structure.copy()
-        
-        # Clean data by converting to records and back
-        try:
-            records = df.to_dict('records')
-            return pd.DataFrame(records)
-        except Exception as e:
-            st.warning(f"Error cleaning {name} data: {str(e)}")
-            return default_structure.copy()
+            df = pd.DataFrame(df)
+        records = df.to_dict('records')
+        return pd.DataFrame(records)
     except Exception as e:
-        st.error(f"Unexpected error in {name}: {str(e)}")
+        st.warning(f"Error in {name}: {str(e)}")
         return default_structure.copy()
 
 # Function to update date in dataframe
 def update_date(df, date_val):
-    # Create a copy to avoid SettingWithCopyWarning
     df_copy = df.copy()
     df_copy['Date'] = date_val.strftime('%Y-%m-%d')
     return df_copy
 
-# Handle form submissions - Purchase
+# Handle form submissions
 def submit_purchase():
-    # Update the session state with clean data
     st.session_state.purchase_df = ensure_valid_dataframe(
         st.session_state.purchase_editor,
         pd.DataFrame({
             'SL': [1],
-            'Date': [date.today().strftime('%Y-%m-%d')],
+            'Date': [st.session_state.selected_date.strftime('%Y-%m-%d')],
             'Customer Name': [''],
             'Amount': [0],
             'Purchase Description': ['']
         }),
         name="Purchase"
     )
-    # Update all dates
-    st.session_state.purchase_df = update_date(st.session_state.purchase_df, selected_date)
+    st.session_state.purchase_df = update_date(st.session_state.purchase_df, st.session_state.selected_date)
+    st.session_state.purchase_df.to_csv("purchase_data.csv", index=False)
 
-# Handle form submissions - Sales
 def submit_sales():
-    # Update the session state with clean data
     st.session_state.sales_df = ensure_valid_dataframe(
         st.session_state.sales_editor,
         pd.DataFrame({
             'SL': [1],
-            'Date': [date.today().strftime('%Y-%m-%d')],
-            'Customer Name': [''],
+            'Date': [st.session_state.selected_date.strftime('%Y-%m-%d')],
+            'Customer Name': ['Starting Balance'],
             'Amount': [0],
-            'Sales Description': ['']
+            'Sales Description': ['Initial Balance']
         }),
         name="Sales"
     )
-    # Update all dates
-    st.session_state.sales_df = update_date(st.session_state.sales_df, selected_date)
+    st.session_state.sales_df = update_date(st.session_state.sales_df, st.session_state.selected_date)
+    st.session_state.sales_df.to_csv("sales_data.csv", index=False)
 
-# Cleaned-up Create PDF function with improved error handling
-def create_pdf(purchase_df, sales_df, date_val, purchase_total, sales_total, profit):
-    try:
-        # First, ensure clean DataFrames with valid data types
-        purchase_df = ensure_valid_dataframe(purchase_df, 
-            pd.DataFrame({
-                'SL': [1],
-                'Date': [date.today().strftime('%Y-%m-%d')],
-                'Customer Name': [''],
-                'Amount': [0],
-                'Purchase Description': ['']
-            }),
-            name="Purchase for PDF"
-        )
-        
-        sales_df = ensure_valid_dataframe(sales_df, 
-            pd.DataFrame({
-                'SL': [1],
-                'Date': [date.today().strftime('%Y-%m-%d')],
-                'Customer Name': [''],
-                'Amount': [0],
-                'Sales Description': ['']
-            }),
-            name="Sales for PDF"
-        )
-        
-        # Ensure Amount columns have numeric values
-        purchase_df['Amount'] = pd.to_numeric(purchase_df['Amount'], errors='coerce').fillna(0)
-        sales_df['Amount'] = pd.to_numeric(sales_df['Amount'], errors='coerce').fillna(0)
-        
-        # Create new PDF with fixed encoding
-        pdf = FPDF()
-        pdf.add_page()
-        
-        # Set font
-        pdf.set_font("Arial", "B", 16)
-        
-        # Title
-        pdf.cell(190, 10, "Business Transaction Report", 1, 1, "C")
-        pdf.ln(10)
-        
-        # Date
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(190, 10, f"Date: {date_val.strftime('%Y-%m-%d')}", 0, 1, "L")
-        pdf.ln(5)
-        
-        # Summary Section
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(190, 10, "Summary:", 0, 1, "L")
-        pdf.ln(2)
-        
-        # Use proper currency formatting with Tk symbol for Bengali Taka
-        pdf.set_font("Arial", "", 12)
-        pdf.cell(95, 10, f"Total Purchase: Tk {purchase_total:,.2f}", 1, 0, "L")
-        pdf.cell(95, 10, f"Total Sales: Tk {sales_total:,.2f}", 1, 1, "L")
-        
-        profit_label = "Profit" if profit >= 0 else "Loss"
-        pdf.cell(190, 10, f"Total {profit_label}: Tk {abs(profit):,.2f}", 1, 1, "L")
-        pdf.ln(10)
-        
-        # Purchase Table
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(190, 10, "Purchase Transactions:", 0, 1, "L")
-        pdf.ln(2)
-        
-        # Table header
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(15, 10, "SL", 1, 0, "C")
-        pdf.cell(35, 10, "Date", 1, 0, "C")
-        pdf.cell(50, 10, "Customer Name", 1, 0, "C")
-        pdf.cell(40, 10, "Amount", 1, 0, "C")
-        pdf.cell(50, 10, "Description", 1, 1, "C")
-        
-        # Table content with safe string handling
-        pdf.set_font("Arial", "", 10)
-        for i, row in purchase_df.iterrows():
-            pdf.cell(15, 10, str(row.get('SL', '')), 1, 0, "C")
-            pdf.cell(35, 10, str(row.get('Date', '')), 1, 0, "C")
-            
-            # Safely truncate customer name if too long
-            customer_name = str(row.get('Customer Name', ''))
-            if len(customer_name) > 20:
-                customer_name = customer_name[:17] + "..."
-            pdf.cell(50, 10, customer_name, 1, 0, "L")
-            
-            # Format amount with error handling
-            amount = row.get('Amount', 0)
-            try:
-                amount_str = f"Tk {float(amount):,.2f}"
-            except (ValueError, TypeError):
-                amount_str = "Tk 0.00"
-            pdf.cell(40, 10, amount_str, 1, 0, "R")
-            
-            # Safely truncate description if too long
-            description = str(row.get('Purchase Description', ''))
-            if len(description) > 20:
-                description = description[:17] + "..."
-            pdf.cell(50, 10, description, 1, 1, "L")
-        
-        pdf.ln(10)
-        
-        # Sales Table
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(190, 10, "Sales Transactions:", 0, 1, "L")
-        pdf.ln(2)
-        
-        # Table header
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(15, 10, "SL", 1, 0, "C")
-        pdf.cell(35, 10, "Date", 1, 0, "C")
-        pdf.cell(50, 10, "Customer Name", 1, 0, "C")
-        pdf.cell(40, 10, "Amount", 1, 0, "C")
-        pdf.cell(50, 10, "Description", 1, 1, "C")
-        
-        # Table content with safe string handling
-        pdf.set_font("Arial", "", 10)
-        for i, row in sales_df.iterrows():
-            pdf.cell(15, 10, str(row.get('SL', '')), 1, 0, "C")
-            pdf.cell(35, 10, str(row.get('Date', '')), 1, 0, "C")
-            
-            # Safely truncate customer name if too long
-            customer_name = str(row.get('Customer Name', ''))
-            if len(customer_name) > 20:
-                customer_name = customer_name[:17] + "..."
-            pdf.cell(50, 10, customer_name, 1, 0, "L")
-            
-            # Format amount with error handling
-            amount = row.get('Amount', 0)
-            try:
-                amount_str = f"Tk {float(amount):,.2f}"
-            except (ValueError, TypeError):
-                amount_str = "Tk 0.00"
-            pdf.cell(40, 10, amount_str, 1, 0, "R")
-            
-            # Safely truncate description if too long
-            description = str(row.get('Sales Description', ''))
-            if len(description) > 20:
-                description = description[:17] + "..."
-            pdf.cell(50, 10, description, 1, 1, "L")
-        
-        # Footer
-        pdf.ln(20)
-        pdf.set_font("Arial", "I", 8)
-        pdf.cell(0, 10, "Business Transaction Manager - Generated on " + date.today().strftime("%Y-%m-%d"), 0, 0, "C")
-        
-        # Return the PDF as bytes with ASCII encoding
-        return pdf.output(dest='S').encode('latin1')
+def submit_expense():
+    st.session_state.expense_df = ensure_valid_dataframe(
+        st.session_state.expense_editor,
+        pd.DataFrame({
+            'SL': [1],
+            'Date': [st.session_state.selected_date.strftime('%Y-%m-%d')],
+            'Customer Name': [''],
+            'Amount': [0],
+            'Expense Description': ['']
+        }),
+        name="Expense"
+    )
+    st.session_state.expense_df = update_date(st.session_state.expense_df, st.session_state.selected_date)
+    st.session_state.expense_df.to_csv("expense_data.csv", index=False)
+
+# Simplified PDF creation
+def create_pdf(purchase_df, sales_df, expense_df, date_val, purchase_total, sales_total, expense_total, balance):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 12)
     
-    except Exception as e:
-        # Detailed error logging
-        st.error(f"PDF Generation Error: {str(e)}")
-        st.error(f"Error Details: {traceback.format_exc()}")
-        raise Exception(f"PDF creation failed: {str(e)}")
+    # Title
+    pdf.cell(190, 10, "Daily Transaction Report", 1, 1, "C")
+    pdf.ln(5)
+    
+    # Date
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(190, 8, f"Date: {date_val.strftime('%Y-%m-%d')}", 0, 1, "L")
+    pdf.ln(5)
+    
+    # Two-column layout
+    pdf.set_font("Arial", "B", 10)
+    # Left Column (Purchase + Expense)
+    pdf.cell(95, 8, "Purchase Transactions", 1, 1, "C")
+    pdf.set_font("Arial", "", 8)
+    pdf.cell(10, 8, "SL", 1, 0, "C")
+    pdf.cell(20, 8, "Customer", 1, 0, "C")
+    pdf.cell(25, 8, "Amount", 1, 0, "C")
+    pdf.cell(40, 8, "Description", 1, 1, "C")
+    for i, row in purchase_df.iterrows():
+        pdf.cell(10, 8, str(row['SL']), 1, 0, "C")
+        customer = str(row['Customer Name'])[:10] + "..." if len(str(row['Customer Name'])) > 10 else str(row['Customer Name'])
+        pdf.cell(20, 8, customer, 1, 0, "L")
+        pdf.cell(25, 8, f"Tk {float(row['Amount']):,.0f}", 1, 0, "R")
+        desc = str(row['Purchase Description'])[:15] + "..." if len(str(row['Purchase Description'])) > 15 else str(row['Purchase Description'])
+        pdf.cell(40, 8, desc, 1, 1, "L")
+    pdf.ln(2)
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(95, 8, "Expense Transactions", 1, 1, "C")
+    pdf.set_font("Arial", "", 8)
+    pdf.cell(10, 8, "SL", 1, 0, "C")
+    pdf.cell(20, 8, "Customer", 1, 0, "C")
+    pdf.cell(25, 8, "Amount", 1, 0, "C")
+    pdf.cell(40, 8, "Description", 1, 1, "C")
+    for i, row in expense_df.iterrows():
+        pdf.cell(10, 8, str(row['SL']), 1, 0, "C")
+        customer = str(row['Customer Name'])[:10] + "..." if len(str(row['Customer Name'])) > 10 else str(row['Customer Name'])
+        pdf.cell(20, 8, customer, 1, 0, "L")
+        pdf.cell(25, 8, f"Tk {float(row['Amount']):,.0f}", 1, 0, "R")
+        desc = str(row['Expense Description'])[:15] + "..." if len(str(row['Expense Description'])) > 15 else str(row['Expense Description'])
+        pdf.cell(40, 8, desc, 1, 1, "L")
+    
+    # Right Column (Sales)
+    pdf.set_xy(105, 25)  # Move to right column
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(95, 8, "Sales Transactions", 1, 1, "C")
+    pdf.set_font("Arial", "", 8)
+    pdf.cell(10, 8, "SL", 1, 0, "C")
+    pdf.cell(20, 8, "Customer", 1, 0, "C")
+    pdf.cell(25, 8, "Amount", 1, 0, "C")
+    pdf.cell(40, 8, "Description", 1, 1, "C")
+    for i, row in sales_df.iterrows():
+        pdf.cell(10, 8, str(row['SL']), 1, 0, "C")
+        customer = str(row['Customer Name'])[:10] + "..." if len(str(row['Customer Name'])) > 10 else str(row['Customer Name'])
+        pdf.cell(20, 8, customer, 1, 0, "L")
+        pdf.cell(25, 8, f"Tk {float(row['Amount']):,.0f}", 1, 0, "R")
+        desc = str(row['Sales Description'])[:15] + "..." if len(str(row['Sales Description'])) > 15 else str(row['Sales Description'])
+        pdf.cell(40, 8, desc, 1, 1, "L")
+    
+    # Summary at bottom
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(190, 8, f"Purchase: Tk {purchase_total:,.0f} | Expense: Tk {expense_total:,.0f} | Sales: Tk {sales_total:,.0f} | Balance: Tk {balance:,.0f}", 1, 1, "C")
+    
+    return pdf.output(dest='S').encode('latin1')
 
-# Create two columns for Purchase and Sales data entry
+# Tabs
 tab1, tab2, tab3 = st.tabs(["📊 Data Entry", "📈 Dashboard", "📋 Export"])
 
 with tab1:
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     # Purchase Section
     with col1:
-        st.markdown('<div class="card" style="border-left: 5px solid #1e40af;">', unsafe_allow_html=True)
-        st.markdown('<h2 style="color: #1e40af; font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem;">💸 Purchase Entry</h2>', unsafe_allow_html=True)
-        
-        # Clean the DataFrame before using data_editor
+        st.markdown('<div class="card" style="border-left: 4px solid #1e40af;">', unsafe_allow_html=True)
+        st.markdown('<h2 style="color: #1e40af; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem;">💸 Purchase</h2>', unsafe_allow_html=True)
         clean_purchase_df = ensure_valid_dataframe(
             st.session_state.purchase_df,
             pd.DataFrame({
                 'SL': [1],
-                'Date': [date.today().strftime('%Y-%m-%d')],
+                'Date': [st.session_state.selected_date.strftime('%Y-%m-%d')],
                 'Customer Name': [''],
                 'Amount': [0],
                 'Purchase Description': ['']
             }),
             name="Purchase"
         )
-        
-        # Display current purchase data
         edited_purchase_df = st.data_editor(
             clean_purchase_df,
             num_rows="dynamic",
             key="purchase_editor",
             use_container_width=True,
-            hide_index=True
+            hide_index=True,
+            column_config={
+                "Customer Name": st.column_config.TextColumn(
+                    "Customer Name",
+                    help="Enter customer name",
+                    default="",
+                    autocomplete=customer_options
+                )
+            }
         )
-        
-        if st.button("Save Purchase Data", key="save_purchase", on_click=submit_purchase):
-            st.success("✅ Purchase data saved successfully!")
-        
+        if st.button("Save Purchase", key="save_purchase", on_click=submit_purchase):
+            st.success("Purchase data saved!")
         st.markdown('</div>', unsafe_allow_html=True)
     
     # Sales Section
     with col2:
-        st.markdown('<div class="card" style="border-left: 5px solid #047857;">', unsafe_allow_html=True)
-        st.markdown('<h2 style="color: #047857; font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem;">💰 Sales Entry</h2>', unsafe_allow_html=True)
-        
-        # Clean the DataFrame before using data_editor
+        st.markdown('<div class="card" style="border-left: 4px solid #047857;">', unsafe_allow_html=True)
+        st.markdown('<h2 style="color: #047857; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem;">💰 Sales</h2>', unsafe_allow_html=True)
         clean_sales_df = ensure_valid_dataframe(
             st.session_state.sales_df,
             pd.DataFrame({
                 'SL': [1],
-                'Date': [date.today().strftime('%Y-%m-%d')],
-                'Customer Name': [''],
+                'Date': [st.session_state.selected_date.strftime('%Y-%m-%d')],
+                'Customer Name': ['Starting Balance'],
                 'Amount': [0],
-                'Sales Description': ['']
+                'Sales Description': ['Initial Balance']
             }),
             name="Sales"
         )
-        
-        # Display current sales data
         edited_sales_df = st.data_editor(
             clean_sales_df,
             num_rows="dynamic",
             key="sales_editor",
             use_container_width=True,
-            hide_index=True
+            hide_index=True,
+            column_config={
+                "Customer Name": st.column_config.TextColumn(
+                    "Customer Name",
+                    help="Enter customer name",
+                    default="",
+                    autocomplete=customer_options
+                )
+            }
         )
-        
-        if st.button("Save Sales Data", key="save_sales", on_click=submit_sales):
-            st.success("✅ Sales data saved successfully!")
-        
+        if st.button("Save Sales", key="save_sales", on_click=submit_sales):
+            st.success("Sales data saved!")
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Expense Section
+    with col3:
+        st.markdown('<div class="card" style="border-left: 4px solid #be123c;">', unsafe_allow_html=True)
+        st.markdown('<h2 style="color: #be123c; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem;">📉 Expense</h2>', unsafe_allow_html=True)
+        clean_expense_df = ensure_valid_dataframe(
+            st.session_state.expense_df,
+            pd.DataFrame({
+                'SL': [1],
+                'Date': [st.session_state.selected_date.strftime('%Y-%m-%d')],
+                'Customer Name': [''],
+                'Amount': [0],
+                'Expense Description': ['']
+            }),
+            name="Expense"
+        )
+        edited_expense_df = st.data_editor(
+            clean_expense_df,
+            num_rows="dynamic",
+            key="expense_editor",
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Customer Name": st.column_config.TextColumn(
+                    "Customer Name",
+                    help="Enter customer name",
+                    default="",
+                    autocomplete=customer_options
+                )
+            }
+        )
+        if st.button("Save Expense", key="save_expense", on_click=submit_expense):
+            st.success("Expense data saved!")
         st.markdown('</div>', unsafe_allow_html=True)
 
 with tab2:
-    # Ensure clean data for calculations
-    clean_purchase_df = ensure_valid_dataframe(
-        st.session_state.purchase_df,
-        pd.DataFrame({
-            'SL': [1],
-            'Date': [date.today().strftime('%Y-%m-%d')],
-            'Customer Name': [''],
-            'Amount': [0],
-            'Purchase Description': ['']
-        }),
-        name="Purchase"
-    )
+    clean_purchase_df = ensure_valid_dataframe(st.session_state.purchase_df, st.session_state.purchase_df, "Purchase")
+    clean_sales_df = ensure_valid_dataframe(st.session_state.sales_df, st.session_state.sales_df, "Sales")
+    clean_expense_df = ensure_valid_dataframe(st.session_state.expense_df, st.session_state.expense_df, "Expense")
     
-    clean_sales_df = ensure_valid_dataframe(
-        st.session_state.sales_df,
-        pd.DataFrame({
-            'SL': [1],
-            'Date': [date.today().strftime('%Y-%m-%d')],
-            'Customer Name': [''],
-            'Amount': [0],
-            'Sales Description': ['']
-        }),
-        name="Sales"
-    )
-    
-    # Ensure Amount columns are numeric
     clean_purchase_df['Amount'] = pd.to_numeric(clean_purchase_df['Amount'], errors='coerce').fillna(0)
     clean_sales_df['Amount'] = pd.to_numeric(clean_sales_df['Amount'], errors='coerce').fillna(0)
+    clean_expense_df['Amount'] = pd.to_numeric(clean_expense_df['Amount'], errors='coerce').fillna(0)
     
-    # Calculate totals
     purchase_total = clean_purchase_df['Amount'].sum()
     sales_total = clean_sales_df['Amount'].sum()
-    profit = sales_total - purchase_total
+    expense_total = clean_expense_df['Amount'].sum()
+    balance = sales_total - (purchase_total + expense_total)
     
     # Summary Stats
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<h2 style="color: #334155; font-size: 1.5rem; font-weight: 600; text-align: center; margin-bottom: 1.5rem;">Business Overview</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 style="color: #334155; font-size: 1.5rem; font-weight: 600; text-align: center; margin-bottom: 1rem;">Business Overview</h2>', unsafe_allow_html=True)
     
-    col_stat1, col_stat2, col_stat3 = st.columns(3)
+    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
     
     with col_stat1:
         st.markdown(
             f"""
             <div class="stat-card" style="border-top: 4px solid #1e40af;">
-                <h3 style="color: #1e40af; font-size: 1.25rem; font-weight: 500; margin-bottom: 0.5rem;">Total Purchase</h3>
-                <p style="font-size: 2rem; font-weight: 700; color: #0f172a; margin: 0;">৳{purchase_total:,.2f}</p>
-                <div style="width: 60px; height: 4px; background-color: #bfdbfe; border-radius: 2px; margin-top: 0.5rem;"></div>
+                <h3 style="color: #1e40af; font-size: 1rem; font-weight: 500;">Purchase</h3>
+                <p style="font-size: 1.5rem; font-weight: 700; color: #0f172a;">৳{purchase_total:,.0f}</p>
             </div>
-            """, 
-            unsafe_allow_html=True
-        )
+            """, unsafe_allow_html=True)
     
     with col_stat2:
         st.markdown(
             f"""
-            <div class="stat-card" style="border-top: 4px solid #047857;">
-                <h3 style="color: #047857; font-size: 1.25rem; font-weight: 500; margin-bottom: 0.5rem;">Total Sales</h3>
-                <p style="font-size: 2rem; font-weight: 700; color: #0f172a; margin: 0;">৳{sales_total:,.2f}</p>
-                <div style="width: 60px; height: 4px; background-color: #a7f3d0; border-radius: 2px; margin-top: 0.5rem;"></div>
+            <div class="stat-card" style="border-top: 4px solid #be123c;">
+                <h3 style="color: #be123c; font-size: 1rem; font-weight: 500;">Expense</h3>
+                <p style="font-size: 1.5rem; font-weight: 700; color: #0f172a;">৳{expense_total:,.0f}</p>
             </div>
-            """, 
-            unsafe_allow_html=True
-        )
+            """, unsafe_allow_html=True)
     
     with col_stat3:
-        profit_label = "Profit" if profit >= 0 else "Loss"
-        border_color = "#047857" if profit >= 0 else "#be123c"
-        text_color = "#047857" if profit >= 0 else "#be123c"
-        bar_color = "#a7f3d0" if profit >= 0 else "#fecdd3"
-        
         st.markdown(
             f"""
-            <div class="stat-card" style="border-top: 4px solid {border_color};">
-                <h3 style="color: {text_color}; font-size: 1.25rem; font-weight: 500; margin-bottom: 0.5rem;">{profit_label}</h3>
-                <p style="font-size: 2rem; font-weight: 700; color: {text_color}; margin: 0;">৳{abs(profit):,.2f}</p>
-                <div style="width: 60px; height: 4px; background-color: {bar_color}; border-radius: 2px; margin-top: 0.5rem;"></div>
+            <div class="stat-card" style="border-top: 4px solid #047857;">
+                <h3 style="color: #047857; font-size: 1rem; font-weight: 500;">Sales</h3>
+                <p style="font-size: 1.5rem; font-weight: 700; color: #0f172a;">৳{sales_total:,.0f}</p>
             </div>
-            """, 
-            unsafe_allow_html=True
-        )
+            """, unsafe_allow_html=True)
+    
+    with col_stat4:
+        color = "#047857" if balance >= 0 else "#be123c"
+        label = "Balance" if balance >= 0 else "Loss"
+        st.markdown(
+            f"""
+            <div class="stat-card" style="border-top: 4px solid {color};">
+                <h3 style="color: {color}; font-size: 1rem; font-weight: 500;">{label}</h3>
+                <p style="font-size: 1.5rem; font-weight: 700; color: {color};">৳{abs(balance):,.0f}</p>
+            </div>
+            """, unsafe_allow_html=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Data Visualizations
+    # Bar Chart
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<h2 style="color: #334155; font-size: 1.5rem; font-weight: 600; text-align: center; margin-bottom: 1.5rem;">Data Visualization</h2>', unsafe_allow_html=True)
-    
-    col_chart1, col_chart2 = st.columns(2)
-    
-    with col_chart1:
-        # Bar chart for comparison
-        fig, ax = plt.subplots(figsize=(10, 6))
-        categories = ['Purchase', 'Sales']
-        values = [purchase_total, sales_total]
-        
-        bars = ax.bar(categories, values, color=['#1e40af', '#047857'])
-        
-        # Add data labels on top of bars
-        for bar in bars:
-            height = bar.get_height()
-            ax.annotate(f'৳{height:,.0f}',
-                        xy=(bar.get_x() + bar.get_width() / 2, height),
-                        xytext=(0, 3),
-                        textcoords="offset points",
-                        ha='center', va='bottom',
-                        fontweight='bold')
-        
-        ax.set_title('Purchase vs Sales Comparison', fontsize=16, fontweight='bold')
-        ax.set_ylabel('Amount (৳)', fontsize=12)
-        ax.grid(axis='y', linestyle='--', alpha=0.7)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        
-        # Add profit/loss annotation
-        profit_text = f'{"Profit" if profit >= 0 else "Loss"}: ৳{abs(profit):,.0f}'
-        profit_color = '#047857' if profit >= 0 else '#be123c'
-        ax.annotate(profit_text, 
-                   xy=(0.5, 0.9), 
-                   xycoords='axes fraction',
-                   fontsize=12,
-                   fontweight='bold',
-                   color=profit_color,
-                   bbox=dict(boxstyle="round,pad=0.5", fc='#f8fafc', ec=profit_color, alpha=0.8))
-        
-        st.pyplot(fig)
-    
-    with col_chart2:
-        if purchase_total > 0 or sales_total > 0:
-            # Create a custom donut chart
-            fig, ax = plt.subplots(figsize=(10, 6))
-            
-            # Data
-            labels = ['Purchase', 'Sales']
-            sizes = [purchase_total, sales_total]
-            colors = ['#1e40af', '#047857']
-            
-            # Create a circle for the center
-            centre_circle = plt.Circle((0, 0), 0.7, fc='white')
-            
-            # Create donut plot
-            ax.pie(sizes, labels=None, colors=colors,
-                   autopct=lambda p: f'৳{p * sum(sizes)/100:,.0f}',
-                   startangle=90, pctdistance=0.85,
-                   wedgeprops=dict(width=0.3, edgecolor='w'))
-            
-            # Add the center circle
-            fig.gca().add_artist(centre_circle)
-            
-            # Equal aspect ratio ensures that pie is drawn as a circle
-            ax.axis('equal')
-            
-            # Add title
-            ax.set_title('Revenue Distribution', fontsize=16, fontweight='bold')
-            
-            # Add custom legend
-            ax.legend(labels, loc="center", bbox_to_anchor=(0.5, 0.5), frameon=False)
-            
-            st.pyplot(fig)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Transactions Table
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<h2 style="color: #334155; font-size: 1.5rem; font-weight: 600; text-align: center; margin-bottom: 1.5rem;">Recent Transactions</h2>', unsafe_allow_html=True)
-    
-    # Show both transactions
-    if not clean_purchase_df.empty and 'Purchase Description' in clean_purchase_df.columns:
-        purchase_display = clean_purchase_df.copy()
-        purchase_display['Type'] = 'Purchase'
-        purchase_display = purchase_display.rename(columns={'Purchase Description': 'Description'})
-    else:
-        purchase_display = pd.DataFrame(columns=['SL', 'Date', 'Customer Name', 'Amount', 'Description', 'Type'])
-    
-    if not clean_sales_df.empty and 'Sales Description' in clean_sales_df.columns:
-        sales_display = clean_sales_df.copy()
-        sales_display['Type'] = 'Sales'
-        sales_display = sales_display.rename(columns={'Sales Description': 'Description'})
-    else:
-        sales_display = pd.DataFrame(columns=['SL', 'Date', 'Customer Name', 'Amount', 'Description', 'Type'])
-    
-    # Combine and display all transactions
-    combined_df = pd.concat([purchase_display, sales_display])
-    combined_df = combined_df[['SL', 'Date', 'Type', 'Customer Name', 'Amount', 'Description']]
-    
-    if not combined_df.empty:
-        st.dataframe(combined_df, use_container_width=True, hide_index=True)
-    else:
-        st.info("No transactions recorded yet.")
-    
+    fig, ax = plt.subplots(figsize=(8, 4))
+    categories = ['Purchase', 'Expense', 'Sales', 'Balance']
+    values = [purchase_total, expense_total, sales_total, balance]
+    colors = ['#1e40af', '#be123c', '#047857', '#047857' if balance >= 0 else '#be123c']
+    bars = ax.bar(categories, values, color=colors)
+    for bar in bars:
+        height = bar.get_height()
+        ax.annotate(f'৳{height:,.0f}', xy=(bar.get_x() + bar.get_width() / 2, height), xytext=(0, 3),
+                    textcoords="offset points", ha='center', va='bottom', fontweight='bold')
+    ax.set_title('Daily Overview', fontsize=14, fontweight='bold')
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    st.pyplot(fig)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with tab3:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<h2 style="color: #334155; font-size: 1.5rem; font-weight: 600; text-align: center; margin-bottom: 1.5rem;">Export Data</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 style="color: #334155; font-size: 1.5rem; font-weight: 600; text-align: center; margin-bottom: 1rem;">Export Data</h2>', unsafe_allow_html=True)
     
-    col_exp1, col_exp2, col_exp3 = st.columns(3)
+    col_exp1, col_exp2, col_exp3, col_exp4 = st.columns(4)
     
-    # Ensure clean data for downloads
-    clean_purchase_df = ensure_valid_dataframe(
-        st.session_state.purchase_df,
-        pd.DataFrame({
-            'SL': [1],
-            'Date': [date.today().strftime('%Y-%m-%d')],
-            'Customer Name': [''],
-            'Amount': [0],
-            'Purchase Description': ['']
-        }),
-        name="Purchase"
-    )
-    
-    clean_sales_df = ensure_valid_dataframe(
-        st.session_state.sales_df,
-        pd.DataFrame({
-            'SL': [1],
-            'Date': [date.today().strftime('%Y-%m-%d')],
-            'Customer Name': [''],
-            'Amount': [0],
-            'Sales Description': ['']
-        }),
-        name="Sales"
-    )
-    
-    # Ensure Amount columns are numeric for exports
-    clean_purchase_df['Amount'] = pd.to_numeric(clean_purchase_df['Amount'], errors='coerce').fillna(0)
-    clean_sales_df['Amount'] = pd.to_numeric(clean_sales_df['Amount'], errors='coerce').fillna(0)
+    clean_purchase_df = ensure_valid_dataframe(st.session_state.purchase_df, st.session_state.purchase_df, "Purchase")
+    clean_sales_df = ensure_valid_dataframe(st.session_state.sales_df, st.session_state.sales_df, "Sales")
+    clean_expense_df = ensure_valid_dataframe(st.session_state.expense_df, st.session_state.expense_df, "Expense")
     
     with col_exp1:
-        if st.button("Download Purchase Data (CSV)", key="download_purchase"):
+        if st.button("Download Purchase CSV", key="download_purchase"):
             csv = clean_purchase_df.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="Click to Download Purchase CSV",
+                label="Download",
                 data=csv,
-                file_name=f"purchase_data_{selected_date.strftime('%Y-%m-%d')}.csv",
+                file_name=f"purchase_{st.session_state.selected_date.strftime('%Y-%m-%d')}.csv",
                 mime="text/csv"
             )
     
     with col_exp2:
-        if st.button("Download Sales Data (CSV)", key="download_sales"):
+        if st.button("Download Sales CSV", key="download_sales"):
             csv = clean_sales_df.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="Click to Download Sales CSV",
+                label="Download",
                 data=csv,
-                file_name=f"sales_data_{selected_date.strftime('%Y-%m-%d')}.csv",
+                file_name=f"sales_{st.session_state.selected_date.strftime('%Y-%m-%d')}.csv",
                 mime="text/csv"
             )
     
     with col_exp3:
-        if st.button("Generate Complete Report (PDF)", key="generate_pdf"):
-            try:
-                # Verify the data is valid before trying to generate PDF
-                valid_purchase_data = not clean_purchase_df.empty and 'Purchase Description' in clean_purchase_df.columns
-                valid_sales_data = not clean_sales_df.empty and 'Sales Description' in clean_sales_df.columns
-                
-                if not valid_purchase_data and not valid_sales_data:
-                    st.error("No valid transaction data available. Please add some transactions first.")
-                else:
-                    # Calculate totals for PDF with proper numeric handling
-                    purchase_total = clean_purchase_df['Amount'].sum()
-                    sales_total = clean_sales_df['Amount'].sum()
-                    profit = sales_total - purchase_total
-                    
-                    # Show progress information
-                    with st.spinner("Generating PDF report..."):
-                        # Generate PDF with improved error handling
-                        pdf_data = create_pdf(
-                            clean_purchase_df, 
-                            clean_sales_df,
-                            selected_date,
-                            purchase_total,
-                            sales_total,
-                            profit
-                        )
-                        
-                        # Offer download
-                        st.success("PDF generated successfully!")
-                        st.download_button(
-                            label="Download PDF Report",
-                            data=pdf_data,
-                            file_name=f"business_report_{selected_date.strftime('%Y-%m-%d')}.pdf",
-                            mime="application/pdf"
-                        )
-            except Exception as e:
-                st.error(f"Error generating PDF: {str(e)}")
-                st.error("If the problem persists, try using simplified data or exporting as CSV instead.")
+        if st.button("Download Expense CSV", key="download_expense"):
+            csv = clean_expense_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Download",
+                data=csv,
+                file_name=f"expense_{st.session_state.selected_date.strftime('%Y-%m-%d')}.csv",
+                mime="text/csv"
+            )
     
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Preview section
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<h2 style="color: #334155; font-size: 1.5rem; font-weight: 600; text-align: center; margin-bottom: 1.5rem;">Report Preview</h2>', unsafe_allow_html=True)
-    
-    # Create tabs for different views
-    preview_tab1, preview_tab2 = st.tabs(["Purchase Data", "Sales Data"])
-    
-    with preview_tab1:
-        if not clean_purchase_df.empty:
-            st.dataframe(clean_purchase_df, use_container_width=True)
-        else:
-            st.info("No purchase data available.")
-    
-    with preview_tab2:
-        if not clean_sales_df.empty:
-            st.dataframe(clean_sales_df, use_container_width=True)
-        else:
-            st.info("No sales data available.")
+    with col_exp4:
+        if st.button("Generate PDF Report", key="generate_pdf"):
+            purchase_total = clean_purchase_df['Amount'].sum()
+            sales_total = clean_sales_df['Amount'].sum()
+            expense_total = clean_expense_df['Amount'].sum()
+            balance = sales_total - (purchase_total + expense_total)
+            pdf_data = create_pdf(clean_purchase_df, clean_sales_df, clean_expense_df, st.session_state.selected_date,
+                                  purchase_total, sales_total, expense_total, balance)
+            st.download_button(
+                label="Download PDF",
+                data=pdf_data,
+                file_name=f"report_{st.session_state.selected_date.strftime('%Y-%m-%d')}.pdf",
+                mime="application/pdf"
+            )
     
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Footer
 st.markdown("""
-<div style="text-align: center; margin-top: 2rem; padding: 1rem; background: linear-gradient(90deg, #1e3a8a, #1e40af); border-radius: 8px; color: white;">
-    <p style="margin-bottom: 0.5rem; font-weight: 500;">Business Transaction Manager</p>
-    <p style="font-size: 0.875rem; opacity: 0.9; margin: 0;">© 2025 | Made with ❤️ for your business</p>
+<div style="text-align: center; margin-top: 1rem; padding: 1rem; background: linear-gradient(90deg, #1e3a8a, #1e40af); border-radius: 8px; color: white;">
+    <p style="margin: 0; font-weight: 500;">© 2025 Business Transaction Manager</p>
 </div>
 """, unsafe_allow_html=True)
 
-# Add required packages to requirements.txt
+# Requirements
 requirements = """
 streamlit
 pandas
